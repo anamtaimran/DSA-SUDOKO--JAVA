@@ -1,0 +1,249 @@
+import javax.swing.*;
+import javax.swing.border.*;
+import java.awt.*;
+import java.util.*;
+
+public class SudokuGUI_Girly extends JFrame {
+
+    private static final int SIZE = 9;
+    private JTextField[][] cells = new JTextField[SIZE][SIZE];
+    private boolean[][] fixed = new boolean[SIZE][SIZE];
+    private int[][] solution = new int[SIZE][SIZE];
+    private JComboBox<String> difficultyBox;
+
+    private final Color BG_COLOR = new Color(255, 228, 225);
+    private final Color TITLE_COLOR = new Color(255, 105, 180);
+    private final Color FIXED_CELL = new Color(255, 182, 193);
+    private final Color EDIT_CELL = new Color(255, 240, 245);
+    private final Color GRID_COLOR = new Color(255, 105, 180);
+    private final Color BUTTON_BG = new Color(255, 105, 180);
+    private final Color BUTTON_HOVER = new Color(255, 182, 193);
+
+    public SudokuGUI_Girly() {
+        setTitle("💖 Sudoku Game💖");
+        setSize(680, 720);
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setLocationRelativeTo(null);
+        setLayout(new BorderLayout(10, 10));
+        getContentPane().setBackground(BG_COLOR);
+
+        add(createTopPanel(), BorderLayout.NORTH);
+        add(createBoardPanel(), BorderLayout.CENTER);
+        add(createControlPanel(), BorderLayout.SOUTH);
+
+        startNewGame((String) difficultyBox.getSelectedItem());
+        setVisible(true);
+    }
+
+    private JPanel createTopPanel() {
+        JPanel panel = new JPanel(new FlowLayout(FlowLayout.CENTER, 30, 10));
+        panel.setBackground(TITLE_COLOR);
+
+        JLabel title = new JLabel(" SUDOKU GAME ");
+        title.setForeground(Color.WHITE);
+        title.setFont(new Font("Comic Sans MS", Font.BOLD, 32));
+
+        difficultyBox = new JComboBox<>(new String[]{"Easy", "Medium", "Hard"});
+        difficultyBox.setFont(new Font("Comic Sans MS", Font.BOLD, 16));
+        difficultyBox.setForeground(Color.MAGENTA);
+
+        panel.add(title);
+        panel.add(difficultyBox);
+        return panel;
+    }
+
+    private JPanel createBoardPanel() {
+        JPanel panel = new JPanel(new GridLayout(SIZE, SIZE));
+        panel.setBorder(new EmptyBorder(15, 15, 15, 15));
+        panel.setBackground(BG_COLOR);
+
+        for (int r = 0; r < SIZE; r++) {
+            for (int c = 0; c < SIZE; c++) {
+                JTextField tf = new JTextField();
+                tf.setHorizontalAlignment(JTextField.CENTER);
+                tf.setFont(new Font("Comic Sans MS", Font.BOLD, 24));
+                tf.setBackground(EDIT_CELL);
+                tf.setForeground(new Color(75, 0, 130));
+
+                tf.addKeyListener(new java.awt.event.KeyAdapter() {
+                    public void keyTyped(java.awt.event.KeyEvent e) {
+                        char ch = e.getKeyChar();
+                        if (!(ch >= '1' && ch <= '9') && ch != '\b') {
+                            e.consume();
+                        }
+                    }
+                });
+
+                int top = (r % 3 == 0) ? 3 : 1;
+                int left = (c % 3 == 0) ? 3 : 1;
+                int bottom = 1;
+                int right = 1;
+                tf.setBorder(new MatteBorder(top, left, bottom, right, GRID_COLOR));
+
+                cells[r][c] = tf;
+                panel.add(tf);
+            }
+        }
+        return panel;
+    }
+
+    private JPanel createControlPanel() {
+        JPanel panel = new JPanel(new FlowLayout(FlowLayout.CENTER, 25, 15));
+        panel.setBackground(BG_COLOR);
+
+        JButton newGame = createButton("✨ New Game ✨");
+        JButton check = createButton("✅ Check");
+        JButton solve = createButton("💡 Solve");
+
+        newGame.addActionListener(e -> startNewGame((String) difficultyBox.getSelectedItem()));
+        check.addActionListener(e -> checkAnswer());
+        solve.addActionListener(e -> showSolution());
+
+        panel.add(newGame);
+        panel.add(check);
+        panel.add(solve);
+        return panel;
+    }
+
+    private JButton createButton(String text) {
+        JButton btn = new JButton(text);
+        btn.setFont(new Font("Comic Sans MS", Font.BOLD, 18));
+        btn.setForeground(Color.WHITE);
+        btn.setBackground(BUTTON_BG);
+        btn.setFocusPainted(false);
+        btn.setBorder(new RoundedBorder(20));
+
+        btn.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseEntered(java.awt.event.MouseEvent evt) { btn.setBackground(BUTTON_HOVER); }
+            public void mouseExited(java.awt.event.MouseEvent evt) { btn.setBackground(BUTTON_BG); }
+        });
+        return btn;
+    }
+
+    private void startNewGame(String level) {
+        for (int r = 0; r < SIZE; r++)
+            for (int c = 0; c < SIZE; c++)
+                fixed[r][c] = false;
+
+        int[][] board = generateSolvedBoard();
+        copyBoard(board, solution);
+
+        int remove;
+        switch (level) {
+            case "Easy": remove = 30; break;
+            case "Medium": remove = 45; break;
+            default: remove = 55; break;
+        }
+
+        removeCellsUsingQueue(board, remove);
+
+        for (int r = 0; r < SIZE; r++)
+            for (int c = 0; c < SIZE; c++) {
+                if (board[r][c] != 0) {
+                    cells[r][c].setText(String.valueOf(board[r][c]));
+                    cells[r][c].setEditable(false);
+                    cells[r][c].setBackground(FIXED_CELL);
+                    cells[r][c].setForeground(new Color(139, 0, 139));
+                    fixed[r][c] = true;
+                } else {
+                    cells[r][c].setText("");
+                    cells[r][c].setEditable(true);
+                    cells[r][c].setBackground(EDIT_CELL);
+                    cells[r][c].setForeground(new Color(75, 0, 130));
+                }
+            }
+    }
+
+    private void checkAnswer() {
+        for (int r = 0; r < SIZE; r++)
+            for (int c = 0; c < SIZE; c++)
+                if (!fixed[r][c] && !cells[r][c].getText().isEmpty()
+                        && Integer.parseInt(cells[r][c].getText()) != solution[r][c]) {
+                    JOptionPane.showMessageDialog(this, "❌ Incorrect value!");
+                    return;
+                }
+        JOptionPane.showMessageDialog(this, "✅ Looks good so far!");
+    }
+
+    private void showSolution() {
+        for (int r = 0; r < SIZE; r++)
+            for (int c = 0; c < SIZE; c++)
+                cells[r][c].setText(String.valueOf(solution[r][c]));
+    }
+
+    private int[][] generateSolvedBoard() {
+        int[][] board = new int[SIZE][SIZE];
+        solveBoard(board);
+        return board;
+    }
+
+    private boolean solveBoard(int[][] board) {
+        for (int r = 0; r < SIZE; r++)
+            for (int c = 0; c < SIZE; c++)
+                if (board[r][c] == 0) {
+                    ArrayList<Integer> nums = new ArrayList<>();
+                    for (int i = 1; i <= 9; i++) nums.add(i);
+                    Collections.shuffle(nums);
+                    for (int n : nums) {
+                        if (isSafe(board, r, c, n)) {
+                            board[r][c] = n;
+                            if (solveBoard(board)) return true;
+                            board[r][c] = 0;
+                        }
+                    }
+                    return false;
+                }
+        return true;
+    }
+
+    private void removeCellsUsingQueue(int[][] board, int count) {
+        Queue<int[]> q = new LinkedList<>();
+        HashSet<String> used = new HashSet<>();
+        Random rand = new Random();
+
+        while (q.size() < count) {
+            int r = rand.nextInt(9);
+            int c = rand.nextInt(9);
+            String key = r + "-" + c;
+            if (!used.contains(key)) {
+                q.add(new int[]{r, c});
+                used.add(key);
+            }
+        }
+
+        while (!q.isEmpty()) {
+            int[] pos = q.poll();
+            board[pos[0]][pos[1]] = 0;
+        }
+    }
+
+    private boolean isSafe(int[][] board, int r, int c, int n) {
+        for (int i = 0; i < SIZE; i++)
+            if (board[r][i] == n || board[i][c] == n) return false;
+
+        int sr = r - r % 3, sc = c - c % 3;
+        for (int i = 0; i < 3; i++)
+            for (int j = 0; j < 3; j++)
+                if (board[sr + i][sc + j] == n) return false;
+
+        return true;
+    }
+
+    private void copyBoard(int[][] src, int[][] dest) {
+        for (int i = 0; i < SIZE; i++)
+            System.arraycopy(src[i], 0, dest[i], 0, SIZE);
+    }
+
+    class RoundedBorder extends AbstractBorder {
+        private int radius;
+        RoundedBorder(int r) { radius = r; }
+        public void paintBorder(Component c, Graphics g, int x, int y, int w, int h) {
+            g.setColor(Color.WHITE);
+            g.drawRoundRect(x, y, w - 1, h - 1, radius, radius);
+        }
+    }
+
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(SudokuGUI_Girly::new);
+    }
+}
